@@ -98,12 +98,11 @@ const server = Bun.serve({
             }), { headers: CORS_HEADERS })
         }
 
-        if (method === "GET" && pathname === "/logout") {
-
+        if (method === "POST" && pathname === "/logout") {
             return new Response(JSON.stringify({ message: "Sesión cerrada", status: 200 }), {
                 headers: {
                     ...CORS_HEADERS,
-                    "Set-Cookie": `token=;HttpOnly;Path=/;Max-Age=0;Expires=0`
+                    "Set-Cookie": `token=; ${COOKIE_SETTINGS}; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`
                 }
             });
         }
