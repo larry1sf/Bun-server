@@ -1,10 +1,12 @@
 import { groqService } from "./services/groq"
 import { cerebrasService } from "./services/cerebras"
+import { openRouterService } from "./services/openrouter"
 import type { AIService,ChatMessage } from "./types"
 
 const services:AIService[] = [
     groqService,
-    cerebrasService
+    cerebrasService,
+    openRouterService
 ]
 let currentServiceIndex = 0
 
