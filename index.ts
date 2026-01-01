@@ -97,7 +97,7 @@ const server = Bun.serve({
             }), { headers: CORS_HEADERS })
         }
 
-        if (method === "POST" && pathname === "/logout") {
+        if (method === "GET" && pathname === "/logout") {
             return new Response(JSON.stringify({ message: "Sesión cerrada", status: 200 }), {
                 headers: {
                     ...CORS_HEADERS,
