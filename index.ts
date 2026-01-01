@@ -7,7 +7,14 @@ import type { AIService, ChatMessage } from "./types"
 import jwt from "jsonwebtoken";
 import { getUser } from "./services/db/users"
 
-const SECRET = "CLAVE_SUPER_SECRETA_CAMBIALA";
+const SECRET = process.env.JWT_SECRET || 'CLAVE_SUPER_SECRETA';
+
+const CORS_HEADERS = {
+    "Access-Control-Allow-Origin": process.env.ORIGIN || "http://localhost:3000",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Credentials": "true"
+}
 
 // Middleware JWT
 function requireAuth(req: Request) {
@@ -35,40 +42,74 @@ function getNextService() {
     return service
 }
 
+const OPCIONES_METHODOS = {
+    "GET": (req: Request) => {
+        const auth = requireAuth(req)
+
+        if (!auth) return new Response("No autorizado", { status: 401, headers: CORS_HEADERS })
+
+        return new Response(JSON.stringify({
+            message: "Te encuentras en el login pero con sesion iniciada",
+            status: 200
+        }), { headers: CORS_HEADERS })
+    },
+    "POST": async (req: Request) => {
+        const { email, password } = await req.json() as { email: string, password: string }
+        const user = await getUser(email, password)
+
+        if (!user) return new Response("Usuario no encontrado", { status: 401, headers: CORS_HEADERS })
+
+        const token = jwt.sign({ email }, SECRET, { expiresIn: "1h" })
+        const isProd = process.env.NODE_ENV === "production";
+        return new Response(JSON.stringify({ message: "Login correcto", status: 200 }), {
+            headers: {
+                ...CORS_HEADERS,
+                "Set-Cookie": `token=${token};HttpOnly;${isProd ? "Secure;" : ""}SameSite=${isProd ? "Strict" : "Lax"};Path=/`
+            }
+        });
+    },
+    "OPTIONS": () => { return new Response(null, { headers: CORS_HEADERS }); },
+}
+
 const server = Bun.serve({
-    port: process.env.PORT ?? 3000,
+    port: process.env.PORT ?? 8080,
     async fetch(req) {
         const { pathname } = new URL(req.url)
-        const method = req.method
+        const method = req.method as keyof typeof OPCIONES_METHODOS
 
-        if (method === "POST" && pathname === "/login") {
-            const { email, password } = await req.json() as { email: string, password: string }
-            const user = await getUser(email, password)
+        if (method === "OPTIONS")
+            return OPCIONES_METHODOS[method]()
 
-            if (!user) return new Response("Usuario no encontrado", { status: 401 })
+        if (pathname === "/login") {
+            const handler = OPCIONES_METHODOS[method]
+            if (handler)
+                return (handler as (req: Request) => Response)(req)
+        }
 
-            const token = jwt.sign({ email }, SECRET, { expiresIn: "1h" })
-            return new Response("Login correcto", {
+        if (pathname === "/dashboard") {
+            const auth = requireAuth(req)
+
+            if (!auth) return new Response("No autorizado", { status: 401, headers: CORS_HEADERS })
+
+            return new Response(JSON.stringify({
+                message: "Te encuentras en el Dashboard",
+                status: 200
+            }), { headers: CORS_HEADERS })
+        }
+
+        if (method === "POST" && pathname === "/logout") {
+            return new Response(JSON.stringify({ message: "Sesión cerrada", status: 200 }), {
                 headers: {
-                    "Set-Cookie": `
-                    token=${token};
-                    HttpOnly;
-                    Secure;
-                    SameSite=Strict;
-                    Path=/
-                    `
+                    ...CORS_HEADERS,
+                    "Set-Cookie": `token=;HttpOnly;Path=/;Max-Age=0;Expires=Thu, 01 Jan 1970 00:00:00 GMT`
                 }
             });
         }
 
-        if (pathname === "dashboard") {
-            const auth = requireAuth(req)
-
-            if (!auth) return new Response("No autorizado", { status: 401 })
-            return new Response("Te encuentras en el Dashboard")
-        }
-
         if (method === "POST" && pathname === "/chat") {
+            const auth = requireAuth(req)
+            if (!auth) return new Response("No autorizado", { status: 401, headers: CORS_HEADERS })
+
             const { messages } = await req.json() as { messages: ChatMessage[] }
             const service = getNextService()
             console.log(`Using service: ${service?.name}`)
@@ -76,6 +117,7 @@ const server = Bun.serve({
 
             return new Response(stream, {
                 headers: {
+                    ...CORS_HEADERS,
                     "Content-Type": "text/event-stream",
                     "Cache-Control": "no-cache",
                     "Connection": "keep-alive",
@@ -83,7 +125,7 @@ const server = Bun.serve({
             })
         }
 
-        return new Response("No sirve", { status: 404 })
+        return new Response("No sirve", { status: 404, headers: CORS_HEADERS })
     }
 })
 
