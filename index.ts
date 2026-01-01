@@ -98,10 +98,15 @@ const server = Bun.serve({
         }
 
         if (method === "GET" && pathname === "/logout") {
+            const isProd = process.env.NODE_ENV === "production";
+            const cookieAttributes = isProd ? "Secure; SameSite=None" : "SameSite=Lax";
+
+            // El valor de la cookie queda vacío (token=;)
+            const setCookieValue = `token=; HttpOnly; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${cookieAttributes}`;
             return new Response(JSON.stringify({ message: "Sesión cerrada", status: 200 }), {
                 headers: {
                     ...CORS_HEADERS,
-                    "Set-Cookie": `token=;HttpOnly;Path=/;Max-Age=0;Expires=Thu, 01 Jan 1970 00:00:00 GMT`
+                    "Set-Cookie": setCookieValue
                 }
             });
         }
