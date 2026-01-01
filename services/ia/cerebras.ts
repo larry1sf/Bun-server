@@ -1,5 +1,5 @@
 import Cerebras from '@cerebras/cerebras_cloud_sdk';
-import type { cerebrasMessage,cerebrasChunk } from '../types';
+import type { cerebrasMessage, cerebrasChunk } from '../../types';
 
 const cerebras = new Cerebras();
 
@@ -15,9 +15,9 @@ export const cerebrasService = {
             top_p: 0.8
         });
 
-        return (async function* (){
+        return (async function* () {
             for await (const chunk of chatCompletion) {
-                yield (chunk.choices as cerebrasChunk)[0]?.delta?.content  || '';
+                yield (chunk.choices as cerebrasChunk)[0]?.delta?.content || '';
             }
         })();
     }
