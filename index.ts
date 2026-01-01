@@ -8,14 +8,16 @@ import jwt from "jsonwebtoken";
 import { getUser } from "./services/db/users"
 
 const SECRET = process.env.JWT_SECRET || 'CLAVE_SUPER_SECRETA';
-
+const isProd = process.env.NODE_ENV === "production";
 const CORS_HEADERS = {
     "Access-Control-Allow-Origin": process.env.ORIGIN || "http://localhost:3000",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Credentials": "true"
 }
-
+const COOKIE_SETTINGS = isProd
+    ? "HttpOnly; Secure; SameSite=None; Path=/"
+    : "HttpOnly; SameSite=Lax; Path=/";
 // Middleware JWT
 function requireAuth(req: Request) {
     const token = getCookie(req, "token");
@@ -58,13 +60,12 @@ const OPCIONES_METHODOS = {
         const user = await getUser(email, password)
 
         if (!user) return new Response("Usuario no encontrado", { status: 401, headers: CORS_HEADERS })
-
         const token = jwt.sign({ email }, SECRET, { expiresIn: "1h" })
-        const isProd = process.env.NODE_ENV === "production";
+
         return new Response(JSON.stringify({ message: "Login correcto", status: 200 }), {
             headers: {
                 ...CORS_HEADERS,
-                "Set-Cookie": `token=${token};HttpOnly;${isProd ? "Secure;" : ""}SameSite=${isProd ? "Strict" : "Lax"};Path=/`
+                "Set-Cookie": `token=${token}; ${COOKIE_SETTINGS}`
             }
         });
     },
@@ -98,15 +99,11 @@ const server = Bun.serve({
         }
 
         if (method === "GET" && pathname === "/logout") {
-            const isProd = process.env.NODE_ENV === "production";
-            const cookieAttributes = isProd ? "Secure; SameSite=None" : "SameSite=Lax";
 
-            // El valor de la cookie queda vacío (token=;)
-            const setCookieValue = `token=; HttpOnly; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${cookieAttributes}`;
             return new Response(JSON.stringify({ message: "Sesión cerrada", status: 200 }), {
                 headers: {
                     ...CORS_HEADERS,
-                    "Set-Cookie": setCookieValue
+                    "Set-Cookie": `token=;HttpOnly;Path=/;Max-Age=0;Expires=0`
                 }
             });
         }
